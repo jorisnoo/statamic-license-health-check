@@ -4,6 +4,7 @@
     "description": "Monitor Statamic license validity without alerting on temporary Outpost outages.",
     "type": "statamic-addon",
     "license": "MIT",
+    "homepage": "https://github.com/jorisnoo/statamic-license-health-check",
     "keywords": [
         "statamic",
         "statamic-addon",
