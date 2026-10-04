@@ -27,3 +27,7 @@ composer test
 ## License
 
 The MIT License. See [LICENSE.md](LICENSE.md).
+
+## Maintainer releases
+
+See [RELEASING.md](RELEASING.md) for versioning, changelog entries and the release command.
