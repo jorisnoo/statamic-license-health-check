@@ -6,23 +6,41 @@ use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
 use Spatie\Health\Enums\Status;
 use Statamic\Licensing\LicenseManager;
+use Throwable;
 
 class StatamicLicensesCheck extends Check
 {
     public function run(): Result
     {
-        $licenses = app(LicenseManager::class);
+        try {
+            return $this->checkLicenses(app(LicenseManager::class));
+        } catch (Throwable $e) {
+            report($e);
+
+            return Result::make()->shortSummary('License status unknown')
+                ->warning('Could not read the Statamic license status. See the application log for details.');
+        }
+    }
+
+    private function checkLicenses(LicenseManager $licenses): Result
+    {
+        $code = $licenses->response('error');
+
+        if ($code !== null) {
+            $transient = ! $licenses->usingLicenseKeyFile() && ($code === 0 || $code === 429 || ($code >= 500 && $code < 600));
+
+            return (new Result(
+                status: $transient ? Status::skipped() : Status::warning(),
+                notificationMessage: "Outpost ({$code}): ".$licenses->requestFailureMessage(),
+                shortSummary: $transient ? 'Outpost unavailable' : 'License check needs attention',
+            ))->meta(['error_code' => $code]);
+        }
 
         $result = Result::make();
 
-        // Outpost failures are inconclusive, so do not alert as if the site's
-        // licenses were invalid. Checking the response directly also catches
-        // connection failures that Statamic caches with a zero error code.
-        if ($licenses->response('error') !== null) {
-            return new Result(
-                status: Status::skipped(),
-                shortSummary: 'Outpost unavailable',
-            );
+        if (! is_bool($licenses->response('statamic.valid'))) {
+            return $result->shortSummary('License status unknown')
+                ->warning('Outpost did not return a Statamic license validity verdict.');
         }
 
         if ($licenses->valid()) {

@@ -30,4 +30,28 @@ class ServiceProviderTest extends TestCase
 
         $this->assertInstanceOf(StatamicLicensesCheck::class, $check);
     }
+
+    #[Test]
+    public function an_existing_check_with_the_same_name_takes_precedence(): void
+    {
+        $this->app->detectEnvironment(fn (): string => 'production');
+        $existing = new class extends StatamicLicensesCheck {};
+        $existing->name('StatamicLicenses');
+        $health = app(Health::class)->checks([$existing]);
+
+        (new ServiceProvider($this->app))->boot();
+
+        $this->assertSame([$existing], $health->registeredChecks()->all());
+    }
+
+    #[Test]
+    public function production_registration_can_be_disabled(): void
+    {
+        $this->app->detectEnvironment(fn (): string => 'production');
+        config(['health.register_statamic_licenses_check' => false]);
+
+        (new ServiceProvider($this->app))->boot();
+
+        $this->assertEmpty(app(Health::class)->registeredChecks());
+    }
 }
