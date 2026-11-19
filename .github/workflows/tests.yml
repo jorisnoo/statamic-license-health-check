@@ -2,12 +2,11 @@ name: Tests
 
 on:
   push:
-    paths:
-      - '**.php'
-      - '.github/workflows/tests.yml'
-      - 'phpunit.xml.dist'
-      - 'composer.json'
-      - 'composer.lock'
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,6 +34,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.40.0
@@ -48,6 +49,9 @@ jobs:
           echo "::add-matcher::${{ runner.tool_cache }}/php.json"
           echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
+      - name: Validate package manifest
+        run: composer validate --strict
+
       - name: Install dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
@@ -58,3 +62,20 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/phpunit
+
+      - name: Check code style
+        if: matrix.php == '8.5' && matrix.laravel == '13.*' && matrix.stability == 'prefer-stable'
+        run: vendor/bin/pint --test
+
+      - name: Audit dependencies
+        if: matrix.stability == 'prefer-stable'
+        run: composer audit --locked
+
+  required:
+    name: Package checks
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the full matrix
+        run: test '${{ needs.test.result }}' = success
